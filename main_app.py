@@ -12,30 +12,22 @@ st.set_page_config(page_title="OLA Ride Analytics", layout="wide")
 # 2. HELPER FUNCTION & ASSETS
 # ================================================================
 
-def get_base64_image(image_path):
-    try:
-        # Check if file exists to avoid errors
-        if os.path.exists(image_path):
-            with open(image_path, "rb") as img_file:
-                return base64.b64encode(img_file.read()).decode()
-        return ""
-    except Exception as e:
-        return ""
-
-# FIX: Use a relative path for GitHub deployment
+# 1. This finds the directory of the current script (the 'pages' folder)
 current_dir = os.path.dirname(__file__)
-logo_path = os.path.join(current_dir, "ola.png")
 
-logo_base64 = get_base64_image(logo_path)
+# 2. This goes UP one level to the root directory where 'ola.png' is
+# '..' means "go back one folder"
+logo_path = os.path.join(current_dir, "..", "ola.png")
+
 
 # =================================================================
 # 3. SIDEBAR LOGO
 # =================================================================
-if logo_base64:
-    # Use the relative path directly here
+# 3. Display the image
+if os.path.exists(logo_path):
     st.sidebar.image(logo_path, use_container_width=True)
 else:
-    st.sidebar.error("Logo file 'ola.png' not found in GitHub repository.")
+    st.sidebar.error("Logo not found. Please check the file path.")
 
 
 # =================================================================
