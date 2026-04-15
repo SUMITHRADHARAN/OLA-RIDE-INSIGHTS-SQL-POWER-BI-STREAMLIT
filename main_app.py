@@ -1,5 +1,7 @@
 import streamlit as st
 import base64
+import os
+
 
 # =================================================================
 # 1. PAGE CONFIG (Must be the first Streamlit command)
@@ -8,23 +10,33 @@ st.set_page_config(page_title="OLA Ride Analytics", layout="wide")
 
 # =================================================================
 # 2. HELPER FUNCTION & ASSETS
-# =================================================================
+# ================================================================
+
 def get_base64_image(image_path):
     try:
-        with open(image_path, "rb") as img_file:
-            return base64.b64encode(img_file.read()).decode()
+        # Check if file exists to avoid errors
+        if os.path.exists(image_path):
+            with open(image_path, "rb") as img_file:
+                return base64.b64encode(img_file.read()).decode()
+        return ""
     except Exception as e:
         return ""
 
-# Updated path to your logo
-logo_path = r"C:\Users\dhara\Documents\Interns\Labmentix\2. Ola Ride insights\ola.png"
+# FIX: Use a relative path for GitHub deployment
+current_dir = os.path.dirname(__file__)
+logo_path = os.path.join(current_dir, "ola.png")
+
 logo_base64 = get_base64_image(logo_path)
 
 # =================================================================
 # 3. SIDEBAR LOGO
 # =================================================================
 if logo_base64:
+    # Use the relative path directly here
     st.sidebar.image(logo_path, use_container_width=True)
+else:
+    st.sidebar.error("Logo file 'ola.png' not found in GitHub repository.")
+
 
 # =================================================================
 # 4. CUSTOM STYLING (Poppins Font & Neon Flexbox Box)
