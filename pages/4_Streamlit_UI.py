@@ -9,24 +9,36 @@ from datetime import date
 # =================================================================
 st.set_page_config(page_title="OLA Ride Analytics | Project Summary", layout="wide")
 
+from pathlib import Path
+
 # =================================================================
-# 2. ASSETS & IMAGE ENCODING
+# 2. ASSETS & IMAGE ENCODING (Fixed for Deployment)
 # =================================================================
 def get_base64_image(image_path):
     try:
+        # Check if path is a Path object or string
+        if isinstance(image_path, Path) and not image_path.exists():
+            return ""
         with open(image_path, "rb") as img_file:
             return base64.b64encode(img_file.read()).decode()
     except Exception:
         return ""
 
-# Path to your local logo
-logo_path = r"C:\Users\dhara\Documents\Interns\Labmentix\2. Ola Ride insights\ola.png"
+# Get path relative to the root of your GitHub Repo
+current_dir = Path(__file__).parent if "__file__" in locals() else Path.cwd()
+root_dir = current_dir.parent 
+logo_path = root_dir / "ola.png"  # Assumes ola.png is in your main repository folder
+
 logo_base64 = get_base64_image(logo_path)
 
 # =================================================================
-# 3. SIDEBAR LOGO
+# 3. SIDEBAR LOGO (Protected from Crashing)
 # =================================================================
-st.sidebar.image(logo_path, use_container_width=True)
+if logo_path.exists():
+    st.sidebar.image(str(logo_path), use_container_width=True)
+else:
+    st.sidebar.warning("Logo 'ola.png' not found in root folder.")
+
 
 # =================================================================
 # 4. CUSTOM STYLING (Poppins Medium & Increased Result Size)
