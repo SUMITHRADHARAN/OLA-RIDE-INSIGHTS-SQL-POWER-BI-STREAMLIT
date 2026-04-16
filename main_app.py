@@ -1,6 +1,7 @@
 import streamlit as st
 import base64
-
+import os
+from pathlib import Path
 # =================================================================
 # 1. PAGE CONFIG (Must be the first Streamlit command)
 # =================================================================
@@ -17,14 +18,26 @@ def get_base64_image(image_path):
         return ""
 
 # Updated path to your logo
-logo_path = r"C:\Users\dhara\Documents\Interns\Labmentix\2. Ola Ride insights\ola.png"
-logo_base64 = get_base64_image(logo_path)
+# logo_path = r"C:\Users\dhara\Documents\Interns\Labmentix\2. Ola Ride insights\ola.png"
+# logo_base64 = get_base64_image(logo_path)
 
 # =================================================================
 # 3. SIDEBAR LOGO
 # =================================================================
-if logo_base64:
-    st.sidebar.image(logo_path, use_container_width=True)
+
+# Get the absolute path to the directory this script is in
+current_dir = Path(__file__).parent if "__file__" in locals() else Path.cwd()
+
+# Go up one level to the root directory where your images likely are
+# Adjust if your logo is in a subfolder like 'assets/logo.png'
+root_dir = current_dir.parent 
+logo_path = root_dir / "logo.png"  # Ensure the filename matches EXACTLY
+
+if logo_path.exists():
+    st.sidebar.image(str(logo_path), use_container_width=True)
+else:
+    st.sidebar.error(f"Logo not found at: {logo_path}")
+
 
 # =================================================================
 # 4. CUSTOM STYLING (Poppins Font & Neon Flexbox Box)
