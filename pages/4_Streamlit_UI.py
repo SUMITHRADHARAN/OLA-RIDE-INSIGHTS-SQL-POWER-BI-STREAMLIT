@@ -143,19 +143,25 @@ def get_db_connection():
         port=3306
     )
 
-# 1. Update your run_query to read from CSV instead of MySQL
 def run_query(q_ignored):
     try:
-        # Get path to the CSV in your root folder
+        # 1. Get the path to the root folder (one level up from /pages/)
         current_dir = Path(__file__).parent if "__file__" in locals() else Path.cwd()
-        csv_path = current_dir.parent / "Ola_Ride_Cleaned_File.csv"
-        return pd.read_csv(csv_path)
+        root_dir = current_dir.parent 
+        
+        # 2. Define the CSV path (Ensure the name matches your GitHub exactly!)
+        csv_path = root_dir / "Ola_Ride_Cleaned_File.csv"
+        
+        # 3. Load the data
+        if csv_path.exists():
+            return pd.read_csv(csv_path)
+        else:
+            st.error(f"⚠️ File NOT found on GitHub at: {csv_path}")
+            return pd.DataFrame()
     except Exception as e:
-        st.error(f"Error loading CSV: {e}")
+        st.error(f"❌ Error loading CSV: {e}")
         return pd.DataFrame()
 
-# 2. Fetch the data once at the start
-df = run_query("") 
 
 def preprocess_data(df):
     """ Cleans the raw OLA dataset """
