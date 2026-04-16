@@ -1,19 +1,20 @@
 import streamlit as st
 import base64
+from pathlib import Path
 
 # =================================================================
 # 1. PAGE CONFIG
 # =================================================================
 st.set_page_config(page_title="OLA Ride Analytics | EDA & Conclusion", layout="wide")
 
-from pathlib import Path
+# DEFINE BRANDING COLORS (This fixes the NameError)
+OLA_LIME = "#D2EF1A"
 
 # =================================================================
-# 2. ASSETS & IMAGE ENCODING (Fixed for Deployment)
+# 2. ASSETS & IMAGE ENCODING
 # =================================================================
 def get_base64_image(image_path):
     try:
-        # Check if path is a Path object or string
         if isinstance(image_path, Path) and not image_path.exists():
             return ""
         with open(image_path, "rb") as img_file:
@@ -21,23 +22,13 @@ def get_base64_image(image_path):
     except Exception:
         return ""
 
-# Get path relative to the root of your GitHub Repo
 current_dir = Path(__file__).parent if "__file__" in locals() else Path.cwd()
 root_dir = current_dir.parent 
-logo_path = root_dir / "ola.png"  # Assumes ola.png is in your main repository folder
-
+logo_path = root_dir / "ola.png"
 logo_base64 = get_base64_image(logo_path)
 
 # =================================================================
-# 3. SIDEBAR LOGO (Protected from Crashing)
-# =================================================================
-if logo_path.exists():
-    st.sidebar.image(str(logo_path), use_container_width=True)
-else:
-    st.sidebar.warning("Logo 'ola.png' not found in root folder.")
-
-# =================================================================
-# 3. CUSTOM STYLING (Poppins Medium & Table Design)
+# 3. CUSTOM STYLING
 # =================================================================
 st.markdown(f"""
     <style>
@@ -48,7 +39,6 @@ st.markdown(f"""
         font-weight: 500; 
     }}
 
-    /* Branding Header Styling */
     .title-box {{
         display: flex; align-items: center; justify-content: center; gap: 30px; 
         padding: 25px; background-color: #121821; border-radius: 15px; 
@@ -59,7 +49,6 @@ st.markdown(f"""
     .sub-title {{ font-size: 24px; color: #ffffff; font-weight: 600; border-bottom: 3px solid {OLA_LIME}; display: inline-block; }}
     .dev-info {{ text-align: right; color: white; }}
 
-    /* Custom Data Table for Column 2 */
     .eda-table {{
         width: 100%; border-collapse: collapse; background-color: #121821;
         border-radius: 10px; overflow: hidden; color: white;
@@ -85,71 +74,39 @@ st.markdown(f"""
 # =================================================================
 # 5. SIDEBAR
 # =================================================================
-st.sidebar.image(logo_path, use_container_width=True)
+if logo_path.exists():
+    st.sidebar.image(str(logo_path), use_container_width=True)
 
 # =================================================================
-# 6. MAIN CONTENT - TWO COLUMN LAYOUT
+# 6. MAIN CONTENT
 # =================================================================
 st.header("Exploratory Data Analysis:")
 col1, col2 = st.columns([1, 1], gap="large")
 
 with col1:
     st.markdown(f"<h2 style='color:{OLA_LIME};'>🔍 Qualitative Analysis</h2>", unsafe_allow_html=True)
-    
     st.subheader("👤 Customer Behavior Analysis:")
-    st.write("• The most active customers book multiple rides per day, with some completing over 50 rides per month.")
-    st.write("• The busiest hours for bookings are between 6 PM and 9 PM.")
-    st.write("• The top 5 customers collectively booked over 1,200 rides.")
+    st.write("• Busiest hours for bookings are between 6 PM and 9 PM.")
     st.write("• Weekend rides saw a 15% increase compared to weekdays.")
 
     st.subheader("🏎️ Driver Performance Analysis:")
     st.write("• Out of 103,025 bookings, approximately 62% were successfully completed.")
-    st.write("• 18,434 bookings were canceled by customers.")
     st.write("• Driver cancellations: 65% personal reasons, 35% vehicle issues.")
-
-    st.subheader("💰 Revenue Insights:")
-    st.write("• Avg fare: Short (<5km) ₹120 | Med (5-15km) ₹250 | Long (>15km) ₹600+.")
-    st.write("• Payment: 45% Digital, 30% UPI/Cash, 25% Cards.")
-    st.write("• Surge pricing applied to 12% of rides, increasing fares by 35%.")
-
-    st.subheader("⚙️ Operational Efficiency:")
-    st.write("• Peak hours (6 PM - 9 PM) require maximum driver availability.")
-    st.write("• Rush hour rides took 25% longer than off-peak times.")
 
 with col2:
     st.markdown(f"<h2 style='color:{OLA_LIME};'>📊 Quantitative Data Summary</h2>", unsafe_allow_html=True)
-    
-    # Custom HTML Table based on your provided image
     st.markdown(f"""
     <table class="eda-table">
         <tr><th>Category</th><th>Details</th></tr>
-        <tr>
-            <td class="cat-col">Volume & Revenue</td>
-            <td>Total Rides: 103,000; Total Booking Value: 57,000,000; Successfully Completed Rides: 64,000; Daily Ride Volume: 3,200-3,400 rides/day</td>
-        </tr>
-        <tr>
-            <td class="cat-col">Cancellations & Issues</td>
-            <td>Driver Cancellations: 18,000; Customer Cancellations: 10,000; Driver Not Found: 10,000; Operational Issues: 10,000+; Non-successful Bookings: 28,000</td>
-        </tr>
-        <tr>
-            <td class="cat-col">Ratings & Satisfaction</td>
-            <td>Average Customer Rating: 4.0; Prime Plus: 4.01; Prime Sedan: 4.00; Bike/eBike: 3.99</td>
-        </tr>
-        <tr>
-            <td class="cat-col">Payment Methods</td>
-            <td>Cash: 19,000,000; UPI: 14,000,000; Credit Card: 1,000,000; Debit Card: ~0</td>
-        </tr>
-        <tr>
-            <td class="cat-col">Operational Distance</td>
-            <td>Peak Daily Distance: 51,000 km/day; Prime Sedan: 235,000 km; eBike: 231,000 km</td>
-        </tr>
+        <tr><td class="cat-col">Volume & Revenue</td><td>Total Rides: 103,000; Total Booking Value: 57,000,000</td></tr>
+        <tr><td class="cat-col">Ratings</td><td>Average Customer Rating: 4.0; Prime Plus: 4.01; Prime Sedan: 4.00</td></tr>
     </table>
     """, unsafe_allow_html=True)
 
 st.divider()
 
 # =================================================================
-# 7. CONCLUSION & SUMMARY
+# 7. CONCLUSION & GITHUB LINK
 # =================================================================
 st.header("💡 CONCLUSION:")
 st.markdown("""
@@ -159,3 +116,20 @@ st.markdown("""
 """)
 
 st.success("**Overall Summary:** This project analyzed Bengaluru’s ride-hailing patterns using SQL and Power BI to derive actionable insights on booking trends and revenue metrics.")
+
+# GitHub Link with Logo
+st.markdown("---")
+st.markdown(
+    f"""
+    <div style="display: flex; align-items: center; background-color: #121821; padding: 20px; border-radius: 15px; border: 2px solid {OLA_LIME};">
+        <img src="https://githubassets.com" width="40" style="margin-right: 20px; filter: invert(1);">
+        <div>
+            <p style="margin: 0; color: white; font-size: 14px;">PROJECT REPOSITORY</p>
+            <a href="https://github.com" target="_blank" style="text-decoration: none; font-weight: bold; color: {OLA_LIME}; font-size: 20px;">
+                View on GitHub
+            </a>
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
