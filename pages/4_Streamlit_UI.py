@@ -1,22 +1,19 @@
 import streamlit as st
-import mysql.connector
 import pandas as pd
 import base64
 from datetime import date
-
-# =================================================================
-# 1. PAGE CONFIG (Must be first)
-# =================================================================
-st.set_page_config(page_title="OLA Ride Analytics | Project Summary", layout="wide")
-
 from pathlib import Path
 
 # =================================================================
-# 2. ASSETS & IMAGE ENCODING (Fixed for Deployment)
+# 1. PAGE CONFIG
+# =================================================================
+st.set_page_config(page_title="OLA Ride Analytics | Streamlit UI", layout="wide")
+
+# =================================================================
+# 2. ASSETS & IMAGE ENCODING
 # =================================================================
 def get_base64_image(image_path):
     try:
-        # Check if path is a Path object or string
         if isinstance(image_path, Path) and not image_path.exists():
             return ""
         with open(image_path, "rb") as img_file:
@@ -24,24 +21,14 @@ def get_base64_image(image_path):
     except Exception:
         return ""
 
-# Get path relative to the root of your GitHub Repo
+# Path setup for Cloud Deployment
 current_dir = Path(__file__).parent if "__file__" in locals() else Path.cwd()
 root_dir = current_dir.parent 
-logo_path = root_dir / "ola.png"  # Assumes ola.png is in your main repository folder
-
+logo_path = root_dir / "ola.png"
 logo_base64 = get_base64_image(logo_path)
 
 # =================================================================
-# 3. SIDEBAR LOGO (Protected from Crashing)
-# =================================================================
-if logo_path.exists():
-    st.sidebar.image(str(logo_path), use_container_width=True)
-else:
-    st.sidebar.warning("Logo 'ola.png' not found in root folder.")
-
-
-# =================================================================
-# 4. CUSTOM STYLING (Poppins Medium & Increased Result Size)
+# 3. CUSTOM STYLING
 # =================================================================
 st.markdown(f"""
     <style>
@@ -49,195 +36,135 @@ st.markdown(f"""
     
     html, body, [class*="css"], .stMarkdown p {{ 
         font-family: 'Poppins', sans-serif; 
-        font-weight: 500; /* MEDIUM FONT WEIGHT */
+        font-weight: 500; 
     }}
 
-    /* Increase Result Table Font Size */
-    [data-testid="stDataFrame"] td, [data-testid="stDataFrame"] th, .stTable td {{
-        font-size: 18px !important;
-    }}
-
-    /* Main Branding Box */
     .title-box {{
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 30px; 
-        padding: 25px; 
-        background-color: #121821; 
-        border-radius: 15px; 
-        border: 5px solid #D2EF1A; 
-        box-shadow: 0px 0px 20px rgba(210, 239, 26, 0.4);
+        display: flex; align-items: center; justify-content: center; gap: 30px; 
+        padding: 25px; background-color: #121821; border-radius: 15px; 
+        border: 5px solid #D2EF1A; box-shadow: 0px 0px 20px rgba(210, 239, 26, 0.4);
         margin: 10px 0px 20px 0px;
     }}
 
-    .logo-img {{ height: 70px; }}
-
-    .ola-text {{
-        font-size: 40px; 
-        color: #D2EF1A; 
-        font-weight: 800;
-        text-transform: uppercase;
-        letter-spacing: 2px;
-        margin: 0;
-    }}
-
-    /* Styled Subtitle */
-    .sub-title-container {{
-        text-align: center;
-        margin-bottom: 20px;
-    }}
-
-    .sub-title {{
-        font-size: 24px;
-        color: #ffffff;
-        font-weight: 600;
-        border-bottom: 3px solid #D2EF1A;
-        display: inline-block;
-        padding-bottom: 5px;
-    }}
-
-    .dev-info {{
-        text-align: right; 
-        line-height: 1.2; 
-        margin-bottom: 5px;
-        color: white;
-    }}
+    .ola-text {{ font-size: 40px; color: #D2EF1A; font-weight: 800; text-transform: uppercase; margin: 0; }}
+    .dev-info {{ text-align: right; color: white; line-height: 1.2; margin-bottom: 5px; }}
     </style>
 """, unsafe_allow_html=True)
 
-# Ola Signature Colors
-OLA_LIME = "#D2EF1A"
-OLA_BG = "#0B0F14"
-OLA_CARD = "#121821"
-OLA_BORDER = "#2A2F3A"
-
 # =================================================================
-# 5. BRANDING HEADER
+# 4. BRANDING HEADER
 # =================================================================
 st.markdown(f"""
 <div class="dev-info">
     <b>Name: SUMITHRA D</b><br>
     Roll Number: 28552 | BATCH: E332
 </div>
-
 <div class="title-box">
-    <img src="data:image/png;base64,{logo_base64}" class="logo-img">
+    <img src="data:image/png;base64,{logo_base64}" height="70">
     <h1 class="ola-text">OLA RIDE INSIGHTS</h1>
-</div>
-
-<div class="sub-title-container">
-    <div class="sub-title"> Streamlit UI </div>
 </div>
 """, unsafe_allow_html=True)
 
 # =================================================================
-# 6. MYSQL CONNECTION & LOGIC(CSV ONLY)
+# 5. DATA LOADING LOGIC (CSV ONLY)
 # =================================================================
-
-def load_data():
+@st.cache_data
+def load_ola_data():
     try:
-        current_dir = Path(__file__).parent if "__file__" in locals() else Path.cwd()
-        root_dir = current_dir.parent 
-        # Verify this exact name is on GitHub
+        # EXACT filename from your GitHub (verify the 's' in Rides)
         csv_path = root_dir / "Ola_Rides_Cleaned_File.csv" 
         
         if csv_path.exists():
             df = pd.read_csv(csv_path)
-            # Basic cleaning
+            # Pre-processing
             df['Date'] = pd.to_datetime(df['Date']).dt.date
+            df['Booking_Value'] = pd.to_numeric(df['Booking_Value'], errors='coerce').fillna(0)
+            df['Ride_Distance'] = pd.to_numeric(df['Ride_Distance'], errors='coerce').fillna(0)
             return df
         else:
-            st.error(f"⚠️ File NOT found: {csv_path.name}")
             return pd.DataFrame()
     except Exception as e:
-        st.error(f"❌ Error: {e}")
+        st.error(f"Error loading data: {e}")
         return pd.DataFrame()
 
 # =================================================================
-# 7. EXECUTION & FILTERS
+# 6. EXECUTION & SIDEBAR FILTERS
 # =================================================================
-df = load_data()
+df = load_ola_data()
 
 if not df.empty:
-    # --- SIDEBAR NAVIGATION ---
-    st.sidebar.title("🔍 Navigation")
-    page = st.sidebar.radio("Select View", ["Dashboard", "Ratings"])
+    # --- Sidebar Logo ---
+    if logo_path.exists():
+        st.sidebar.image(str(logo_path), use_container_width=True)
+
+    st.sidebar.title("🔍 Navigation & Filters")
     
+    # 1. Page Navigation
+    page = st.sidebar.radio(
+        "Select Dashboard View",
+        ["Dashboard", "Overall Metrics", "Vehicle Analysis", "Revenue Insights"]
+    )
+
     st.sidebar.markdown("---")
     st.sidebar.header("Global Filters")
 
-    # Dynamic Filters using the loaded DataFrame (No SQL needed)
-    booking_status = ["All"] + sorted(df['Booking_Status'].unique().tolist())
-    vehicle_type = ["All"] + sorted(df['Vehicle_Type'].unique().tolist())
-    
-    bs = st.sidebar.selectbox("Booking Status", booking_status)
-    vt = st.sidebar.selectbox("Vehicle Type", vehicle_type)
+    # 2. Date Filter
+    start_date_val = date(2024, 7, 1)
+    end_date_val = date(2024, 7, 31)
+    date_range = st.sidebar.date_input(
+        "Select Date Range",
+        [start_date_val, end_date_val],
+        min_value=date(2024, 1, 1),
+        max_value=date(2024, 12, 31)
+    )
 
-    # Apply Filters to the DataFrame
+    # 3. Dynamic Dropdowns (Directly from CSV columns)
+    bs_list = ["All"] + sorted(df['Booking_Status'].unique().tolist())
+    vt_list = ["All"] + sorted(df['Vehicle_Type'].unique().tolist())
+    pm_list = ["All"] + sorted(df['Payment_Method'].unique().tolist())
+
+    selected_bs = st.sidebar.selectbox("Booking Status", bs_list)
+    selected_vt = st.sidebar.selectbox("Vehicle Type", vt_list)
+    selected_pm = st.sidebar.selectbox("Payment Method", pm_list)
+
+    # --- Apply Filters ---
     filtered_df = df.copy()
-    if bs != "All":
-        filtered_df = filtered_df[filtered_df['Booking_Status'] == bs]
-    if vt != "All":
-        filtered_df = filtered_df[filtered_df['Vehicle_Type'] == vt]
-
-    # --- DISPLAY ---
-    st.subheader("📊 Dataset Overview")
-    st.dataframe(filtered_df.head(10), use_container_width=True)
     
+    # Apply Date Filter
+    if isinstance(date_range, list) and len(date_range) == 2:
+        filtered_df = filtered_df[(filtered_df['Date'] >= date_range[0]) & (filtered_df['Date'] <= date_range[1])]
+    
+    # Apply Dropdown Filters
+    if selected_bs != "All":
+        filtered_df = filtered_df[filtered_df['Booking_Status'] == selected_bs]
+    if selected_vt != "All":
+        filtered_df = filtered_df[filtered_df['Vehicle_Type'] == selected_vt]
+    if selected_pm != "All":
+        filtered_df = filtered_df[filtered_df['Payment_Method'] == selected_pm]
+
+    # =================================================================
+    # 7. MAIN DASHBOARD DISPLAY
+    # =================================================================
     if page == "Dashboard":
         st.title("🚖 OLA Executive Dashboard")
-        m1, m2, m3 = st.columns(3)
+        
+        # KPI Row
+        m1, m2, m3, m4 = st.columns(4)
         m1.metric("Total Revenue", f"₹{filtered_df['Booking_Value'].sum():,.0f}")
-        m2.metric("Total Rides", len(filtered_df))
+        m2.metric("Total Rides", f"{len(filtered_df):,}")
         m3.metric("Avg Distance", f"{filtered_df['Ride_Distance'].mean():.2f} km")
+        m4.metric("Success Rate", f"{(len(filtered_df[filtered_df['Booking_Status']=='Success'])/len(filtered_df)*100):.1f}%" if len(filtered_df)>0 else "0%")
+
+        st.markdown("---")
+        st.subheader("📊 Recent Filtered Data")
+        st.dataframe(filtered_df.head(15), use_container_width=True)
+
+    else:
+        st.info(f"Viewing: {page} - (Add your specific charts for this section here)")
+
 else:
-    st.error("Please ensure 'Ola_Rides_Cleaned_File.csv' is in your GitHub root folder.")
-# =================================================================
-#           SIDEBAR NAVIGATION & FILTERS
-# =================================================================
+    st.error("⚠️ 'Ola_Rides_Cleaned_File.csv' not found. Please check your GitHub repository.")
 
-st.sidebar.title("🔍 Navigation & Filters")
-# 1. Navigation
-page = st.sidebar.radio(
-    "Select Dashboard View",
-    ["Dashboard", "Overall", "Vehicle Type", "Revenue", "Cancellation", "Ratings"]
-)
-
-st.sidebar.markdown("---")
-st.sidebar.header("Global Filters")
-
-# 2. Date Filter (Fixed Range: Jan 1 to Jan 31, 2024)
-start_date_val = date(2024, 7, 1)
-end_date_val = date(2024, 7, 31)
-
-date_range = st.sidebar.date_input(
-    "Select Date Range",
-    [start_date_val, end_date_val],
-    min_value=date(2024, 1, 1),
-    max_value=date(2024, 12, 31)
-)
-
-# 3. Dynamic Dropdown Filters
-booking_status = ["All"] + run_query("SELECT DISTINCT Booking_Status FROM ola_ride_cleaned_file")["Booking_Status"].tolist()
-vehicle_type = ["All"] + run_query("SELECT DISTINCT Vehicle_Type FROM ola_ride_cleaned_file")["Vehicle_Type"].tolist()
-pm_list = ["All"] + run_query("SELECT DISTINCT Payment_Method FROM ola_ride_cleaned_file")["Payment_Method"].tolist()
-
-bs = st.sidebar.selectbox("Booking Status", booking_status)
-vt = st.sidebar.selectbox("Vehicle Type", vehicle_type)
-pm = st.sidebar.selectbox("Payment Method", pm_list)
-
-# 4. SQL WHERE Clause Construction
-filters = []
-if isinstance(date_range, list) and len(date_range) == 2:
-    filters.append(f"Date BETWEEN '{date_range[0]}' AND '{date_range[1]}'")
-elif isinstance(date_range, date):
-    filters.append(f"Date = '{date_range}'")
-
-if bs != "All": filters.append(f"Booking_Status = '{bs}'")
-if vt != "All": filters.append(f"Vehicle_Type = '{vt}'")
-if pm != "All": filters.append(f"Payment_Method = '{pm}'")
-where = " WHERE " + " AND ".join(filters) if filters else ""
 
 
 # =================================================================
