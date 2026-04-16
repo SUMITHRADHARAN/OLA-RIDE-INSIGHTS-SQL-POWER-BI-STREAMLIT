@@ -8,24 +8,31 @@ import base64
 # =================================================================
 st.set_page_config(page_title="OLA Ride Analytics | SQL Queries", layout="wide")
 
-# =================================================================
+from pathlib import Path
+
 # 2. ASSETS & IMAGE ENCODING
-# =================================================================
 def get_base64_image(image_path):
     try:
-        with open(image_path, "rb") as img_file:
-            return base64.b64encode(img_file.read()).decode()
+        if image_path.exists():
+            with open(image_path, "rb") as img_file:
+                return base64.b64encode(img_file.read()).decode()
+        return ""
     except Exception:
         return ""
 
-# Path to your local logo
-logo_path = r"C:\Users\dhara\Documents\Interns\Labmentix\2. Ola Ride insights\ola.png"
+# Get path relative to this file (works on Cloud)
+current_dir = Path(__file__).parent if "__file__" in locals() else Path.cwd()
+root_dir = current_dir.parent 
+logo_path = root_dir / "ola.png"  # Assumes ola.png is in your main folder
+
 logo_base64 = get_base64_image(logo_path)
 
-# =================================================================
 # 3. SIDEBAR LOGO
-# =================================================================
-st.sidebar.image(logo_path, use_container_width=True)
+if logo_path.exists():
+    st.sidebar.image(str(logo_path), use_container_width=True)
+else:
+    st.sidebar.warning("Logo not found. Check GitHub root folder.")
+
 
 # =================================================================
 # 4. CUSTOM STYLING (Poppins Font & Neon Branding)
