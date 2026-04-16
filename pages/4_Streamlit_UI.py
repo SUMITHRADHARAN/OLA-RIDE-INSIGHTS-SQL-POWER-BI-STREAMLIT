@@ -3,6 +3,7 @@ import pandas as pd
 import base64
 from datetime import date
 from pathlib import Path
+import matplotlib.pyplot as plt
 
 # =================================================================
 # 1. PAGE CONFIG
@@ -10,7 +11,7 @@ from pathlib import Path
 st.set_page_config(page_title="OLA Ride Analytics | Streamlit UI", layout="wide")
 
 # =================================================================
-# 2. ASSETS & IMAGE ENCODING
+# 2. ASSETS & PATHS
 # =================================================================
 def get_base64_image(image_path):
     try:
@@ -18,17 +19,15 @@ def get_base64_image(image_path):
             return ""
         with open(image_path, "rb") as img_file:
             return base64.b64encode(img_file.read()).decode()
-    except Exception:
-        return ""
+    except Exception: return ""
 
-# Path setup for Cloud Deployment
-current_dir = Path(__file__).parent if "__file__" in locals() else Path.cwd()
-root_dir = current_dir.parent 
+# Streamlit Cloud runs from the root of your GitHub repo
+root_dir = Path.cwd() 
 logo_path = root_dir / "ola.png"
 logo_base64 = get_base64_image(logo_path)
 
 # =================================================================
-# 3. CUSTOM STYLING
+# 3. CUSTOM STYLING (OLA Branding)
 # =================================================================
 st.markdown(f"""
     <style>
@@ -69,72 +68,52 @@ st.markdown(f"""
 # 5. DATA LOADING LOGIC (CSV ONLY)
 # =================================================================
 @st.cache_data
-def load_ola_data():
-    try:
-        # EXACT filename from your GitHub (verify the 's' in Rides)
-        csv_path = root_dir / "Ola_Rides_Cleaned_File.csv" 
-        
-        if csv_path.exists():
-            df = pd.read_csv(csv_path)
-            # Pre-processing
-            df['Date'] = pd.to_datetime(df['Date']).dt.date
-            df['Booking_Value'] = pd.to_numeric(df['Booking_Value'], errors='coerce').fillna(0)
-            df['Ride_Distance'] = pd.to_numeric(df['Ride_Distance'], errors='coerce').fillna(0)
-            return df
-        else:
-            return pd.DataFrame()
-    except Exception as e:
-        st.error(f"Error loading data: {e}")
-        return pd.DataFrame()
+def load_data():
+    csv_file = "Ola_Rides_Cleaned_File.csv"
+    if Path(csv_file).exists():
+        df = pd.read_csv(csv_file)
+        # Pre-processing
+        df['Date'] = pd.to_datetime(df['Date']).dt.date
+        df['Booking_Value'] = pd.to_numeric(df['Booking_Value'], errors='coerce').fillna(0)
+        df['Ride_Distance'] = pd.to_numeric(df['Ride_Distance'], errors='coerce').fillna(0)
+        df['Customer_Rating'] = pd.to_numeric(df['Customer_Rating'], errors='coerce').fillna(0)
+        df['Driver_Ratings'] = pd.to_numeric(df['Driver_Ratings'], errors='coerce').fillna(0)
+        return df
+    return pd.DataFrame()
+
+df = load_data()
 
 # =================================================================
-# 6. EXECUTION & SIDEBAR FILTERS
+# 6. SIDEBAR NAVIGATION & FILTERS
 # =================================================================
-df = load_ola_data()
-
 if not df.empty:
-    # --- Sidebar Logo ---
     if logo_path.exists():
         st.sidebar.image(str(logo_path), use_container_width=True)
 
-    st.sidebar.title("🔍 Navigation & Filters")
+    st.sidebar.title("🔍 Navigation")
+    page = st.sidebar.radio("Select View", ["Dashboard", "Overall", "Vehicle Type", "Revenue", "Cancellation", "Ratings"])
     
-    # 1. Page Navigation
-    page = st.sidebar.radio(
-        "Select Dashboard View",
-        ["Dashboard", "Overall Metrics", "Vehicle Analysis", "Revenue Insights"]
-    )
-
     st.sidebar.markdown("---")
     st.sidebar.header("Global Filters")
 
-    # 2. Date Filter
+    # Date Filter
     start_date_val = date(2024, 7, 1)
     end_date_val = date(2024, 7, 31)
-    date_range = st.sidebar.date_input(
-        "Select Date Range",
-        [start_date_val, end_date_val],
-        min_value=date(2024, 1, 1),
-        max_value=date(2024, 12, 31)
-    )
+    date_range = st.sidebar.date_input("Select Date Range", [start_date_val, end_date_val])
 
-    # 3. Dynamic Dropdowns (Directly from CSV columns)
+    # Dynamic Filters
     bs_list = ["All"] + sorted(df['Booking_Status'].unique().tolist())
     vt_list = ["All"] + sorted(df['Vehicle_Type'].unique().tolist())
     pm_list = ["All"] + sorted(df['Payment_Method'].unique().tolist())
-
+    
     selected_bs = st.sidebar.selectbox("Booking Status", bs_list)
     selected_vt = st.sidebar.selectbox("Vehicle Type", vt_list)
     selected_pm = st.sidebar.selectbox("Payment Method", pm_list)
 
-    # --- Apply Filters ---
+    # Apply Filters to the dataframe
     filtered_df = df.copy()
-    
-    # Apply Date Filter
     if isinstance(date_range, list) and len(date_range) == 2:
         filtered_df = filtered_df[(filtered_df['Date'] >= date_range[0]) & (filtered_df['Date'] <= date_range[1])]
-    
-    # Apply Dropdown Filters
     if selected_bs != "All":
         filtered_df = filtered_df[filtered_df['Booking_Status'] == selected_bs]
     if selected_vt != "All":
@@ -142,372 +121,92 @@ if not df.empty:
     if selected_pm != "All":
         filtered_df = filtered_df[filtered_df['Payment_Method'] == selected_pm]
 
-    # =================================================================
-    # 7. MAIN DASHBOARD DISPLAY
-    # =================================================================
+    # =============================================================
+    # 7. PAGE CONTENT LOGIC
+    # =============================================================
+    
+    # --- 1. DASHBOARD PAGE ---
     if page == "Dashboard":
-        st.title("🚖 OLA Executive Dashboard")
+        st.title("🚖 Executive Dashboard")
+        m1, m2, m3, m4, m5 = st.columns(5)
         
-        # KPI Row
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Total Revenue", f"₹{filtered_df['Booking_Value'].sum():,.0f}")
-        m2.metric("Total Rides", f"{len(filtered_df):,}")
-        m3.metric("Avg Distance", f"{filtered_df['Ride_Distance'].mean():.2f} km")
-        m4.metric("Success Rate", f"{(len(filtered_df[filtered_df['Booking_Status']=='Success'])/len(filtered_df)*100):.1f}%" if len(filtered_df)>0 else "0%")
+        m1.metric("Total Revenue", f"₹{filtered_df['Booking_Value'].sum()/1e6:.1f}M")
+        m2.metric("Success Rides", f"{len(filtered_df[filtered_df['Booking_Status']=='Success'])/1e3:.1f}K")
+        m3.metric("Total Dist", f"{filtered_df['Ride_Distance'].sum()/1e3:.1f}K Km")
+        m4.metric("Avg Rating", f"{filtered_df['Customer_Rating'].mean():.1f} ⭐")
+        m5.metric("Avg Driver", f"{filtered_df['Driver_Ratings'].mean():.1f} ⭐")
 
-        st.markdown("---")
-        st.subheader("📊 Recent Filtered Data")
-        st.dataframe(filtered_df.head(15), use_container_width=True)
+        st.divider()
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("### Avg Value by Vehicle")
+            chart1 = filtered_df.groupby("Vehicle_Type")["Booking_Value"].mean()
+            st.bar_chart(chart1, color="#D2EF1A")
+        with col2:
+            st.markdown("### Distance by Date")
+            chart2 = filtered_df.groupby("Date")["Ride_Distance"].sum()
+            st.bar_chart(chart2, color="#D2EF1A")
 
-    else:
-        st.info(f"Viewing: {page} - (Add your specific charts for this section here)")
+    # --- 2. OVERALL PAGE ---
+    elif page == "Overall":
+        st.title("📊 Overall Performance")
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("TOTAL RIDES", f"{len(filtered_df):,}")
+        c2.metric("REVENUE", f"₹{filtered_df['Booking_Value'].sum():,.0f}")
+        c3.metric("AVG RATING", f"{filtered_df['Customer_Rating'].mean():.2f} ⭐")
+        c4.metric("DISTANCE", f"{filtered_df['Ride_Distance'].sum():,.0f} km")
+
+        st.divider()
+        l_col, r_col = st.columns(2)
+        with l_col:
+            st.subheader("Ride Volume Over Time")
+            chart3 = filtered_df.groupby("Date").size()
+            st.line_chart(chart3, color="#D2EF1A")
+        with r_col:
+            st.subheader("Booking Status")
+            status_data = filtered_df['Booking_Status'].value_counts()
+            fig, ax = plt.subplots()
+            ax.pie(status_data, labels=status_data.index, autopct='%1.1f%%', colors=['#D2EF1A', '#FF4B4B', '#444444', '#888888'])
+            fig.patch.set_facecolor('none')
+            st.pyplot(fig)
+
+    # --- 3. VEHICLE TYPE PAGE ---
+    elif page == "Vehicle Type":
+        st.title("🚗 Vehicle Type Performance")
+        v_stats = filtered_df.groupby("Vehicle_Type").agg({
+            'Booking_Value': 'sum',
+            'Ride_Distance': 'mean'
+        }).reset_index()
+        st.dataframe(v_stats, use_container_width=True)
+        st.bar_chart(v_stats.set_index("Vehicle_Type")['Booking_Value'], color="#D2EF1A")
+
+    # --- 4. REVENUE PAGE ---
+    elif page == "Revenue":
+        st.title("💰 Revenue Insights")
+        st.metric("Total Portfolio Value", f"₹{filtered_df['Booking_Value'].sum():,.2f}")
+        rev_chart = filtered_df.groupby("Date")["Booking_Value"].sum()
+        st.area_chart(rev_chart, color="#D2EF1A")
+
+    # --- 5. CANCELLATION PAGE ---
+    elif page == "Cancellation":
+        st.title("🚫 Cancellation Analysis")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.subheader("Canceled by Customer")
+            df_cust = filtered_df[filtered_df['Booking_Status'] == 'Canceled by Customer']
+            if not df_cust.empty:
+                st.bar_chart(df_cust['Canceled_Rides_by_Customer'].value_counts(), color="#FF4B4B")
+        with col2:
+            st.subheader("Canceled by Driver")
+            df_drv = filtered_df[filtered_df['Booking_Status'] == 'Canceled by Driver']
+            if not df_drv.empty:
+                st.bar_chart(df_drv['Canceled_Rides_by_Driver'].value_counts(), color="#FF4B4B")
+
+    # --- 6. RATINGS PAGE ---
+    elif page == "Ratings":
+        st.title("⭐ Ratings Overview")
+        df_ratings = filtered_df.groupby("Vehicle_Type")[['Customer_Rating', 'Driver_Ratings']].mean()
+        st.bar_chart(df_ratings, color=["#D2EF1A", "#888888"])
 
 else:
-    st.error("⚠️ 'Ola_Rides_Cleaned_File.csv' not found. Please check your GitHub repository.")
-
-
-
-# =================================================================
-#           1. DASHBOARD PAGE
-# =================================================================
-if page == "Dashboard":
-    st.title("🚖 OLA Executive Dashboard")
-    
-    # --- KPI Metrics Row ---
-    st.subheader("Key Performance Indicators")
-    m1, m2, m3, m4, m5 = st.columns(5)
-
-    try:
-        kpi_data = run_query(f"""
-            SELECT 
-                COALESCE(SUM(Booking_Value), 0) as total_rev,
-                COUNT(CASE WHEN Booking_Status = 'Success' THEN 1 END) as success_bookings,
-                COALESCE(SUM(Ride_Distance), 0) as total_dist,
-                COALESCE(AVG(Customer_Rating), 0) as avg_ctat, 
-                COALESCE(AVG(Driver_Ratings), 0) as avg_vtat  
-            FROM ola_ride_cleaned_file
-            {where}
-        """).iloc[0]
-
-        m1.metric("Total Revenue", f"₹{kpi_data['total_rev']/1000000:.1f}M")
-        m2.metric("Successful Bookings", f"{int(kpi_data['success_bookings']/1000)}K")
-        m3.metric("Distance Travelled", f"{int(kpi_data['total_dist']/1000)}Km")
-        m4.metric("Avg CTAT Time", f"{int(kpi_data['avg_ctat'])}")
-        m5.metric("Avg VTAT Time", f"{int(kpi_data['avg_vtat'])}")
-    except Exception as e:
-        st.error(f"KPI Error: {e}")
-
-    st.divider()
-
-    # --- Charts Row 1: Side-by-Side ---
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.markdown("### Avg Booking Value by Vehicle Type")
-        df_avg_val = run_query(f"SELECT Vehicle_Type, ROUND(AVG(Booking_Value), 2) as avg_value FROM ola_ride_cleaned_file {where} GROUP BY Vehicle_Type")
-        st.bar_chart(df_avg_val.set_index("Vehicle_Type"), color=OLA_LIME)
-
-    with col2:
-        st.markdown("### Ride Distribution by Date")
-        df_dist = run_query(f"SELECT Date, SUM(Ride_Distance) as sum_distance FROM ola_ride_cleaned_file {where} GROUP BY Date ORDER BY Date")
-        st.bar_chart(df_dist.set_index("Date"), color=OLA_LIME)
-
-    st.divider()
-
-    # --- Charts Row 2: 3-Column Section ---
-    c1, c2, c3 = st.columns(3)
-
-    with c1:
-        st.markdown("<h3 style='text-align: center;'>Most Preferable Vehicle Type</h3>", unsafe_allow_html=True)
-        df_pref = run_query(f"SELECT Vehicle_Type, COUNT(*) as ride_count FROM ola_ride_cleaned_file {where} GROUP BY Vehicle_Type ORDER BY ride_count DESC")
-        st.bar_chart(df_pref.set_index("Vehicle_Type"), horizontal=True, color=OLA_LIME)
-
-    with c2:
-        st.markdown("<h3 style='text-align: center;'>Avg Customer Rating</h3>", unsafe_allow_html=True)
-        df_rating = run_query(f"SELECT Vehicle_Type, AVG(Customer_Rating) as avg_rating FROM ola_ride_cleaned_file {where} GROUP BY Vehicle_Type")
-        st.area_chart(df_rating.set_index("Vehicle_Type"), color=OLA_LIME)
-
-    with c3:
-        st.markdown("<h3 style='text-align: center;'>Top Pickup Locations</h3>", unsafe_allow_html=True)
-        loc_where = where + " AND Booking_Status = 'Success'" if "WHERE" in where else " WHERE Booking_Status = 'Success'"
-        df_loc = run_query(f"SELECT Pickup_Location, COUNT(*) as SuccessCount FROM ola_ride_cleaned_file {loc_where} GROUP BY Pickup_Location ORDER BY SuccessCount DESC LIMIT 6")
-        st.table(df_loc)
-
-# =================================================================
-#           2. OVERALL PERFORMANCE PAGE
-# =================================================================
-elif page == "Overall":
-    st.title("📊 Overall Performance")
-    
-    # --- KPI Metrics Row ---
-    c1, c2, c3, c4 = st.columns(4)
-    metrics = run_query(f"""
-        SELECT COUNT(*) as rides, SUM(Booking_Value) as rev, 
-        AVG(Customer_Rating) as rat, SUM(Ride_Distance) as dist 
-        FROM ola_ride_cleaned_file {where}
-    """).iloc[0]
-
-    c1.metric("TOTAL RIDES", f"{int(metrics['rides']):,}")
-    c2.metric("REVENUE (₹)", f"₹{float(metrics['rev'] or 0):,.0f}")
-    c3.metric("AVG RATING", f"{round(float(metrics['rat'] or 0), 2)} ⭐")
-    c4.metric("DISTANCE (KM)", f"{round(float(metrics['dist'] or 0), 1)} km")
-
-    st.divider()
-
-        # --- Charts Row ---
-    col_left, col_right = st.columns(2)
-
-    with col_left:
-        st.subheader("Ride Volume Over Time")
-        df_time = run_query(f"SELECT Date, COUNT(*) as c FROM ola_ride_cleaned_file {where} GROUP BY Date ORDER BY Date")
-        st.line_chart(df_time.set_index("Date"), color=OLA_LIME)
-
-    with col_right:
-        st.subheader("Booking Status Breakdown")
-        import matplotlib.pyplot as plt
-        
-        # Fetching status counts
-        df_status = run_query(f"SELECT Booking_Status, COUNT(*) as c FROM ola_ride_cleaned_file {where} GROUP BY Booking_Status")
-        
-        if not df_status.empty:
-            fig, ax = plt.subplots(figsize=(6, 6))
-            # OLA Branding Colors: Lime for Success, Red for Canceled, Greys for others
-            colors = [OLA_LIME, '#FF4B4B', '#444444', '#888888', '#AAAAAA']
-            
-            # Creating the Pie Chart
-            ax.pie(df_status['c'], labels=df_status['Booking_Status'], 
-                   autopct='%1.1f%%', startangle=140, colors=colors,
-                   textprops={'color':"white", 'fontsize': 10})
-            
-            # Make background transparent to match OLA UI
-            fig.patch.set_facecolor('none')
-            ax.set_facecolor('none')
-            
-            st.pyplot(fig)
-        else:
-            st.info("No status data available.")
-
-# =================================================================
-#           3. VEHICLE TYPE PERFORMANCE PAGE
-# =================================================================
-elif page == "Vehicle Type":
-    st.title("🚗 Vehicle Type Performance")
-
-    # 1. DATA RETRIEVAL
-    df_vehicle_stats = run_query(f"""
-        SELECT 
-            Vehicle_Type,
-            SUM(Booking_Value) as total_val,
-            SUM(CASE WHEN Booking_Status = 'Success' THEN Booking_Value ELSE 0 END) as success_val,
-            ROUND(AVG(Ride_Distance), 2) as avg_dist,
-            SUM(Ride_Distance) as total_dist
-        FROM ola_ride_cleaned_file {where}
-        GROUP BY Vehicle_Type
-    """)
-
-    if not df_vehicle_stats.empty:
-        # 2. KPI GRID (Custom Table Layout)
-        st.subheader("Vehicle Metrics Overview")
-        
-        # Header Row
-        h1, h2, h3, h4, h5 = st.columns([1.5, 1, 1, 1, 1])
-        h1.write("**Vehicle Type**")
-        h2.write("**Total Value**")
-        h3.write("**Success Value**")
-        h4.write("**Avg Dist**")
-        h5.write("**Total Dist**")
-        st.divider()
-
-        # Data Rows
-        vehicle_list = ["Prime Sedan", "Prime SUV", "Prime Plus", "Mini", "Auto", "Bike", "eBike"]
-        for vehicle in vehicle_list:
-            row = df_vehicle_stats[df_vehicle_stats['Vehicle_Type'].str.lower() == vehicle.lower()]
-            if not row.empty:
-                c1, c2, c3, c4, c5 = st.columns([1.5, 1, 1, 1, 1])
-                c1.write(f"**{vehicle}**")
-                c2.write(f"{row['total_val'].values[0]/1e6:.2f}M")
-                c3.write(f"{row['success_val'].values[0]/1e6:.2f}M")
-                c4.write(f"{row['avg_dist'].values[0]}")
-                c5.write(f"{int(row['total_dist'].values[0]/1000)}K")
-        
-        st.divider()
-
-        # 3. VISUALIZATION
-        st.subheader("📊 Top 5 Vehicle Types by Ride Distance")
-        df_top5 = df_vehicle_stats.sort_values(by='total_dist', ascending=False).head(5)
-        st.bar_chart(df_top5.set_index("Vehicle_Type")["total_dist"], color=OLA_LIME, horizontal=True)
-    else:
-        st.info("No vehicle data found for the current filters.")
-
-# =================================================================
-#           4. REVENUE ANALYSIS PAGE
-# =================================================================
-elif page == "Revenue":
-    st.title("💰 Revenue Analysis")
-    
-    # --- KPI Metrics Row ---
-    st.subheader("Financial Highlights")
-    rev_metrics = run_query(f"""
-        SELECT 
-            SUM(Booking_Value) as total_rev,
-            AVG(Booking_Value) as avg_rev,
-            MAX(Booking_Value) as max_rev
-        FROM ola_ride_cleaned_file {where}
-    """).iloc[0]
-
-    r1, r2, r3 = st.columns(3)
-    r1.metric("Total Revenue", f"₹{rev_metrics['total_rev']/1e6:.2f}M")
-    r2.metric("Avg Booking Value", f"₹{int(rev_metrics['avg_rev'])}")
-    r3.metric("Highest Booking", f"₹{int(rev_metrics['max_rev'])}")
-
-    st.divider()
-
-    # --- ROW 1: Revenue by Payment ---
-    st.subheader("Revenue by Payment Method")
-    df_payment = run_query(f"SELECT Payment_Method, SUM(Booking_Value) as v FROM ola_ride_cleaned_file {where} GROUP BY 1")
-    st.bar_chart(df_payment.set_index("Payment_Method"), color=OLA_LIME)
-
-    st.divider()
-
-    # --- ROW 2: SIDE-BY-SIDE CHARTS ---
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.subheader("Daily Distance Distribution")
-        df_daily = run_query(f"SELECT Date, SUM(Ride_Distance) as dist FROM ola_ride_cleaned_file {where} GROUP BY 1 ORDER BY 1")
-        if not df_daily.empty:
-            st.bar_chart(df_daily.set_index("Date"), color=OLA_LIME)
-        else:
-            st.info("No distance data available.")
-
-    with col2:
-        st.subheader("Top 5 High-Value Customers")
-        df_top_cust = run_query(f"SELECT Customer_ID, SUM(Booking_Value) as v FROM ola_ride_cleaned_file {where} GROUP BY 1 ORDER BY 2 DESC LIMIT 5")
-        if not df_top_cust.empty:
-            st.bar_chart(df_top_cust.set_index("Customer_ID"), color=OLA_LIME)
-        else:
-            st.info("No customer data available.")
-
-
-# =================================================================
-#           5. CANCELLATION ANALYSIS PAGE
-# =================================================================
-elif page == "Cancellation":
-    st.title("🚫 Cancellation Analysis")
-
-    # --- KPI Metrics Row ---
-    st.subheader("Cancellation Overview")
-    m1, m2, m3, m4 = st.columns(4)
-    
-    kpi_q = f"""
-        SELECT 
-            COUNT(Booking_ID) as total,
-            COUNT(CASE WHEN Booking_Status = 'Success' THEN 1 END) as success,
-            COUNT(CASE WHEN Booking_Status LIKE '%Canceled%' THEN 1 END) as canceled,
-            COUNT(CASE WHEN Incomplete_Rides = 'Yes' THEN 1 END) as incomplete
-        FROM ola_ride_cleaned_file {where}
-    """
-    kpis = run_query(kpi_q).iloc[0]
-
-    m1.metric("Total Bookings", f"{int(kpis['total']/1000)}K")
-    m2.metric("Total Success", f"{int(kpis['success']/1000)}K")
-    m3.metric("Total Cancelled", f"{int(kpis['canceled']/1000)}K")
-    m4.metric("Total Incomplete", f"{int(kpis['incomplete']/1000)}K")
-
-    st.divider()
-
-    # --- Incomplete Rides Section ---
-    st.subheader("📝 Incomplete Rides Detail")
-    inc_filter = f"{where} AND Incomplete_Rides = 'Yes'" if where else "WHERE Incomplete_Rides = 'Yes'"
-    inc_data = run_query(f"SELECT Booking_ID, Customer_ID, Incomplete_Rides_Reason FROM ola_ride_cleaned_file {inc_filter}")
-
-    if not inc_data.empty:
-        st.dataframe(inc_data, use_container_width=True)
-    else:
-        st.info("No incomplete rides found.")
-
-    st.divider()
-
-        # --- Cancellation Reasons Breakdown (Consistent Custom Colors) ---
-    col1, col2 = st.columns(2)
-    import matplotlib.pyplot as plt
-
-    # Your requested professional color palette
-    custom_colors = ['#FF3131', '#FF66B2', "#33B8FF", "#87EB91", '#9932CC', '#8B4513', "#5132CD"]
-
-    with col1:
-        st.subheader("📊 Reasons: Canceled by Customer")
-        cust_clause = f"{where} AND Booking_Status = 'Canceled by Customer' AND Canceled_Rides_by_Customer <> 'Unknown'" if where else "WHERE Booking_Status = 'Canceled by Customer' AND Canceled_Rides_by_Customer <> 'Unknown'"
-        df_cust = run_query(f"SELECT Canceled_Rides_by_Customer as Reason, COUNT(*) as Count FROM ola_ride_cleaned_file {cust_clause} GROUP BY 1 ORDER BY 2 DESC")
-        
-        if not df_cust.empty:
-            fig1, ax1 = plt.subplots(figsize=(5, 5)) 
-            # autopct for clear values, startangle for better alignment
-            ax1.pie(df_cust['Count'], labels=df_cust['Reason'], 
-                    autopct='%1.1f%%', startangle=140, 
-                    colors=custom_colors, 
-                    textprops={'color':"white", 'fontsize':10, 'fontweight':'bold'})
-            
-            fig1.patch.set_facecolor('none') # Matches dark theme
-            st.pyplot(fig1)
-        else:
-            st.info("No customer cancellations found.")
-
-    with col2:
-        st.subheader("📊 Reasons: Canceled by Driver")
-        driv_clause = f"{where} AND Booking_Status = 'Canceled by Driver' AND Canceled_Rides_by_Driver <> 'Unknown'" if where else "WHERE Booking_Status = 'Canceled by Driver' AND Canceled_Rides_by_Driver <> 'Unknown'"
-        df_driver = run_query(f"SELECT Canceled_Rides_by_Driver as Reason, COUNT(*) as Count FROM ola_ride_cleaned_file {driv_clause} GROUP BY 1 ORDER BY 2 DESC")
-        
-        if not df_driver.empty:
-            fig2, ax2 = plt.subplots(figsize=(5, 5)) 
-            ax2.pie(df_driver['Count'], labels=df_driver['Reason'], 
-                    autopct='%1.1f%%', startangle=140, 
-                    colors=custom_colors, 
-                    textprops={'color':"white", 'fontsize':10, 'fontweight':'bold'})
-            
-            fig2.patch.set_facecolor('none') # Matches dark theme
-            st.pyplot(fig2)
-        else:
-            st.info("No driver cancellations found.")
-
-
-
-# =================================================================
-#           6. RATINGS ANALYSIS PAGE
-# =================================================================
-elif page == "Ratings":
-    st.title("⭐ Rating Analysis")
-
-    # --- Vehicle Rating Metrics ---
-    df_ratings = run_query(f"SELECT Vehicle_Type, ROUND(AVG(Customer_Rating), 2) as cust_avg, ROUND(AVG(Driver_Ratings), 2) as drv_avg FROM ola_ride_cleaned_file {where} GROUP BY 1")
-
-    st.subheader("Avg Customer Rating (Per Vehicle)")
-    if not df_ratings.empty:
-        cols = st.columns(7)
-        vehicle_order = ["Prime Sedan", "Prime SUV", "Prime Plus", "Mini", "Auto", "Bike", "eBike"]
-        for i, v_name in enumerate(vehicle_order):
-            row = df_ratings[df_ratings['Vehicle_Type'].str.lower() == v_name.lower()]
-            val = row['cust_avg'].values[0] if not row.empty else "-"
-            cols[i].metric(v_name, val)
-
-    st.divider()
-
-    # --- Distribution Row ---
-    st.subheader("📊 Rating Distribution Analysis")
-    c1, c2 = st.columns(2)
-
-    with c1:
-        st.write("**Customer Rating Frequency**")
-        df_c = run_query(f"SELECT Customer_Rating as Rating, COUNT(*) as Count FROM ola_ride_cleaned_file {where} GROUP BY 1")
-        st.bar_chart(df_c.set_index("Rating"), color=OLA_LIME)
-
-    with c2:
-        st.write("**Driver Rating Frequency**")
-        df_d = run_query(f"SELECT Driver_Ratings as Rating, COUNT(*) as Count FROM ola_ride_cleaned_file {where} GROUP BY 1")
-        st.bar_chart(df_d.set_index("Rating"), color=OLA_LIME)
-
-    st.divider()
-
-    # --- Horizontal Summary ---
-    st.subheader("Avg Customer Rating by Category")
-    st.bar_chart(df_ratings.set_index("Vehicle_Type")["cust_avg"], color=OLA_LIME, horizontal=True)
+    st.error("⚠️ 'Ola_Rides_Cleaned_File.csv' not found. Please upload it to your GitHub root folder.")
