@@ -143,15 +143,19 @@ def get_db_connection():
         port=3306
     )
 
-def run_query(q):
+# 1. Update your run_query to read from CSV instead of MySQL
+def run_query(q_ignored):
     try:
-        conn = get_db_connection()
-        df = pd.read_sql(q, conn)
-        conn.close()
-        return df
+        # Get path to the CSV in your root folder
+        current_dir = Path(__file__).parent if "__file__" in locals() else Path.cwd()
+        csv_path = current_dir.parent / "Ola_Ride_Cleaned_File.csv"
+        return pd.read_csv(csv_path)
     except Exception as e:
-        st.error(f"Database Error: {e}")
+        st.error(f"Error loading CSV: {e}")
         return pd.DataFrame()
+
+# 2. Fetch the data once at the start
+df = run_query("") 
 
 def preprocess_data(df):
     """ Cleans the raw OLA dataset """
