@@ -132,68 +132,67 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # =================================================================
-# 6. MYSQL CONNECTION & LOGIC
+# 6. MYSQL CONNECTION & LOGIC(CSV ONLY)
 # =================================================================
-def get_db_connection():
-    return mysql.connector.connect(
-        host="127.0.0.1",
-        user="root",
-        password="dm3879@D",
-        database="Ola_Rides",
-        port=3306
-    )
 
-def run_query(q_ignored):
+def load_data():
     try:
-        # Get path to the root folder
         current_dir = Path(__file__).parent if "__file__" in locals() else Path.cwd()
         root_dir = current_dir.parent 
-        
-        # EXACT filename from your GitHub (with the 's' in Rides)
+        # Verify this exact name is on GitHub
         csv_path = root_dir / "Ola_Rides_Cleaned_File.csv" 
         
         if csv_path.exists():
-            return pd.read_csv(csv_path)
+            df = pd.read_csv(csv_path)
+            # Basic cleaning
+            df['Date'] = pd.to_datetime(df['Date']).dt.date
+            return df
         else:
-            # Helps you debug if the name is still wrong
-            st.error(f"⚠️ File NOT found. Looking for: {csv_path.name}")
+            st.error(f"⚠️ File NOT found: {csv_path.name}")
             return pd.DataFrame()
     except Exception as e:
-        st.error(f"❌ Error loading CSV: {e}")
+        st.error(f"❌ Error: {e}")
         return pd.DataFrame()
 
-
-def preprocess_data(df):
-    """ Cleans the raw OLA dataset """
-    df['Booking_Value'] = pd.to_numeric(df['Booking_Value'], errors='coerce').fillna(0)
-    df['Ride_Distance'] = pd.to_numeric(df['Ride_Distance'], errors='coerce').fillna(0)
-    df['Customer_Rating'] = df['Customer_Rating'].fillna(df['Customer_Rating'].median())
-    df['Driver_Ratings'] = df['Driver_Ratings'].fillna(df['Driver_Ratings'].median())
-    df['Date'] = pd.to_datetime(df['Date']).dt.date
-    df['Vehicle_Type'] = df['Vehicle_Type'].str.strip()
-    df['Booking_Status'] = df['Booking_Status'].str.strip()
-    df = df.drop_duplicates()
-    return df
-
 # =================================================================
-# 7. EXECUTION
+# 7. EXECUTION & FILTERS
 # =================================================================
-# Fetch data first so 'df' is defined
-df = run_query("SELECT * FROM Ola_Ride_Cleaned_File")
+df = load_data()
 
 if not df.empty:
-    cleaned_df = preprocess_data(df)
+    # --- SIDEBAR NAVIGATION ---
+    st.sidebar.title("🔍 Navigation")
+    page = st.sidebar.radio("Select View", ["Dashboard", "Ratings"])
     
+    st.sidebar.markdown("---")
+    st.sidebar.header("Global Filters")
+
+    # Dynamic Filters using the loaded DataFrame (No SQL needed)
+    booking_status = ["All"] + sorted(df['Booking_Status'].unique().tolist())
+    vehicle_type = ["All"] + sorted(df['Vehicle_Type'].unique().tolist())
+    
+    bs = st.sidebar.selectbox("Booking Status", booking_status)
+    vt = st.sidebar.selectbox("Vehicle Type", vehicle_type)
+
+    # Apply Filters to the DataFrame
+    filtered_df = df.copy()
+    if bs != "All":
+        filtered_df = filtered_df[filtered_df['Booking_Status'] == bs]
+    if vt != "All":
+        filtered_df = filtered_df[filtered_df['Vehicle_Type'] == vt]
+
+    # --- DISPLAY ---
     st.subheader("📊 Dataset Overview")
-    st.dataframe(cleaned_df.head(10), use_container_width=True)
+    st.dataframe(filtered_df.head(10), use_container_width=True)
     
-    if st.button("💾 Save Cleaned Data to CSV"):
-        cleaned_df.to_csv("ola_cleaned_file.csv", index=False)
-        st.success("File saved successfully!")
+    if page == "Dashboard":
+        st.title("🚖 OLA Executive Dashboard")
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Total Revenue", f"₹{filtered_df['Booking_Value'].sum():,.0f}")
+        m2.metric("Total Rides", len(filtered_df))
+        m3.metric("Avg Distance", f"{filtered_df['Ride_Distance'].mean():.2f} km")
 else:
-    st.warning("No data found in the database. Please check your MySQL connection.")
-
-
+    st.error("Please ensure 'Ola_Rides_Cleaned_File.csv' is in your GitHub root folder.")
 # =================================================================
 #           SIDEBAR NAVIGATION & FILTERS
 # =================================================================
