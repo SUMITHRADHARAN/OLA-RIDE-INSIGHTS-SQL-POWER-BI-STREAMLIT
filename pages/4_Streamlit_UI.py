@@ -145,18 +145,18 @@ def get_db_connection():
 
 def run_query(q_ignored):
     try:
-        # 1. Get the path to the root folder (one level up from /pages/)
+        # Get path to the root folder
         current_dir = Path(__file__).parent if "__file__" in locals() else Path.cwd()
         root_dir = current_dir.parent 
         
-        # 2. Define the CSV path (Ensure the name matches your GitHub exactly!)
-        csv_path = root_dir / "Ola_Ride_Cleaned_File.csv"
+        # EXACT filename from your GitHub (with the 's' in Rides)
+        csv_path = root_dir / "Ola_Rides_Cleaned_File.csv" 
         
-        # 3. Load the data
         if csv_path.exists():
             return pd.read_csv(csv_path)
         else:
-            st.error(f"⚠️ File NOT found on GitHub at: {csv_path}")
+            # Helps you debug if the name is still wrong
+            st.error(f"⚠️ File NOT found. Looking for: {csv_path.name}")
             return pd.DataFrame()
     except Exception as e:
         st.error(f"❌ Error loading CSV: {e}")
