@@ -1,6 +1,6 @@
 import streamlit as st
 import base64
-from pathlib import Path  # <--- CRITICAL IMPORT
+from pathlib import Path
 
 # =================================================================
 # 1. PAGE CONFIG
@@ -8,28 +8,40 @@ from pathlib import Path  # <--- CRITICAL IMPORT
 st.set_page_config(page_title="OLA Ride Analytics | Project Summary", layout="wide")
 
 # =================================================================
-# 2. PATHS & ASSETS
+# 2. PATHS & IMAGE ENCODING
 # =================================================================
+def get_base64_image(image_path):
+    try:
+        with open(image_path, "rb") as img_file:
+            return base64.b64encode(img_file.read()).decode()
+    except Exception:
+        return ""
+
 # Get the absolute path to the directory this script is in (the 'pages' folder)
 current_dir = Path(__file__).parent if "__file__" in locals() else Path.cwd()
 
-# Move up one level to the root directory where 'ola.png' is stored
+# Move up to root directory to find the image
 root_dir = current_dir.parent 
 logo_path = root_dir / "ola.png"
 
-# =================================================================
-# 3. SIDEBAR LOGO (Protected to prevent deployment crashes)
-# =================================================================
-if logo_path.exists():
-    st.sidebar.image(str(logo_path), use_container_width=True)
-else:
-    # This warning shows if the image is missing, but the app won't crash
-    st.sidebar.warning("Logo file 'ola.png' not found in root directory.")
+# --- THE FIX: Create the missing variable ---
+logo_base64 = get_base64_image(logo_path)
 
 # =================================================================
 # 3. SIDEBAR LOGO
 # =================================================================
-# st.sidebar.image(logo_path, use_container_width=True)
+if logo_path.exists():
+    # Use the variable you just created
+    st.sidebar.markdown(
+        f"""
+        <div style="text-align: center;">
+            <img src="data:image/png;base64,{logo_base64}" width="200">
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+else:
+    st.sidebar.warning("Logo file 'ola.png' not found.")
 
 # =================================================================
 # 4. CUSTOM STYLING (Poppins Font & Neon Branding)
